@@ -1,0 +1,30 @@
+library(sp)
+library(raster)
+library(rgdal)
+library(trend)
+#输入一个文件夹内的单波段TIFF数据，在这里是历年的NDVI年最大值
+flnames './yearmax/', pattern = '.tif$')
+fl "./yearmax/", flnames)
+firs for (i in 2:35) {
+  r   firs }
+
+fun function(y){
+  if(length(na.omit(y)) <35) return(c(NA, NA, NA))   #删除数据不连续含有NA的像元
+  av   MK_estimate #Sen斜率估计
+  slope $estimate
+  MK_test $p.value
+  return(c(av, slope, MK_test))
+}
+
+e #栅格计算
+e_mean #提取均值图层
+e_slope #提取sen斜率
+e_MKtest #提取p值
+
+plot(e_mean)
+plot(e_slope)
+plot(e_MKtest)
+
+writeRaster(e_mean, "e_mean.tif", format="GTiff", overwrite=T)
+writeRaster(e_slope, "e_slope.tif", format="GTiff", overwrite=T)
+writeRaster(e_MKtest, "e_MKtest.tif", format="GTiff", overwrite=T)

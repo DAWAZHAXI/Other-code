@@ -1,0 +1,65 @@
+var MIN_SCALE = 1/3;
+var MAX_SCALE = 3;
+var MIN_NEIGHBORS = 144;
+
+// 用上核密度测距
+var GapFill = function(src, fill, kernelSize) {
+  var kernel = ee.Kernel.square(kernelSize * 30, "meters", false)
+  
+  // 从一景影像里揪出相似像元 
+  var common = src.mask().and(fill.mask())
+  var fc = fill.updateMask(common)
+  var sc = src.updateMask(common)
+
+ //通过回归找到主要的比例因子。
+   //
+  var regress = fc.addBands(sc)
+  regress = regress.select(regress.bandNames().sort())
+  var fit = regress.reduceNeighborhood(ee.Reducer.linearFit().forEach(src.bandNames()),  kernel, null, false)
+  var offset = fit.select(".*_offset")
+  var scale = fit.select(".*_scale")
+
+  //使用just means和stddev查找次级缩放因子
+  var reducer = ee.Reducer.mean().combine(ee.Reducer.stdDev(), null, true)
+  var src_stats = src.reduceNeighborhood(reducer, kernel, null, false)
+  var fill_stats = fill.reduceNeighborhood(reducer, kernel, null, false)
+  var scale2 = src_stats.select(".*stdDev").divide(fill_stats.select(".*stdDev"))
+  var offset2 = src_stats.select(".*mean").subtract(fill_stats.select(".*mean").multiply(scale2))
+
+  var invalid = scale.lt(MIN_SCALE).or(scale.gt(MAX_SCALE))
+  scale = scale.where(invalid, scale2)
+  offset = offset.where(invalid, offset2)
+
+//当其他方法均失败时，只需将均值之差用作偏移量。
+  var invalid2 = scale.lt(MIN_SCALE).or(scale.gt(MAX_SCALE))
+  scale = scale.where(invalid2, 1)
+  offset = offset.where(invalid2, src_stats.select(".*mean").subtract(fill_stats.select(".*mean")))
+
+  // Apply the scaling and mask off pixels that didn't have enough neighbors.
+  var count = common.reduceNeighborhood(ee.Reducer.count(), kernel, null, true, "boxcar")
+  var scaled = fill.multiply(scale).add(offset)
+      .updateMask(count.gte(MIN_NEIGHBORS))
+
+  return src.unmask(scaled, true)
+}
+
+var source = ee.Image("LANDSAT/LE7_L1T/LE70440342016075EDC00")
+var fill = ee.Image("LANDSAT/LE7_L1T/LE70440342016027EDC00")
+
+Map.addLayer(fill, {min:0, max:200, bands:["B3", "B2", "B1"]}, "fill")
+Map.addLayer(source, {min:0, max:200, bands:["B3", "B2", "B1"]}, "destination")
+//
+var result = GapFill(source, fill, 10);
+var results2 =result.clip(roi)
+            .reproject('EPSG:4326', null, 30);
+Map.addLayer(results2, {min:0, max:200, bands:["B3", "B2", "B1"]}, "filled");
+//
+
+Export.image.toDrive({
+  image:results2,
+  region:roi,
+  description: "results2",
+  scale:30,
+  fileNamePrefix:'dawa', 
+  maxPixels:1e13,
+  });

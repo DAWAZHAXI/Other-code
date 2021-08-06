@@ -1,0 +1,205 @@
+clc;clear all;close all
+
+%1.读入彩色图像 并转换成灰度图 显示%
+
+rgb=imread('pears.png');
+
+if ndims(rgb)==3
+
+    I=rgb2gray(rgb);
+
+else
+
+    I=rgb;
+
+end
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(1,2,1);imshow(rgb);title('原图');
+
+subplot(1,2,2);imshow(I);title('灰度图');
+
+
+
+%2.进行分割图像%
+
+%采用sobel边缘算子对图像进行水平和垂直滤波
+
+%求取其模值
+
+%soble算子滤波后的图像在边界处会显示比较大的值，没有边界处的值会很小
+
+hy = fspecial('sobel');
+
+hx = hy';
+
+Iy = imfilter(double(I),hy,'replicate');
+
+Ix = imfilter(double(I),hx,'replicate');
+
+gradmag = sqrt(Ix.^2+Iy.^2);
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(1,2,1);imshow(I,[]);title('灰度图像');
+
+subplot(1,2,2);imshow(gradmag,[]);title('梯度幅值图像');
+
+   
+
+%可否直接对梯度幅值图像使用分水岭算法？
+
+%直接使用分水岭算法对梯度幅值图像分割 结果往往存在过度分割的现象；
+
+%因此 需要对前景和背景进行标记，以获得更好地分割效果
+
+L=watershed(gradmag);
+
+Lrgb=label2rgb(L);
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(1,2,1);imshow(gradmag,[]);title('梯度幅值图像');
+
+subplot(1,2,2);imshow(Lrgb,[]);title('梯度幅值做分水岭变换');
+
+
+
+
+%4.计算背景标记
+
+%在Iobrcbr中 暗像素属于北京 阈值操作
+
+bw = im2bw(Iobrcbr,graythresh(Iobrcbr));
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(1,2,1);imshow(Iobrcbr,[]);title('基于重建的开闭操作');
+
+subplot(1,2,2);imshow(bw,[]);title('阈值分割');
+
+ 
+
+%背景像素在黑色区域 理想情形下 不必要求背景标记太接近于要分割的对象边缘；
+
+%通过计算‘骨架影响范围’来细化背景，或者SKIZ，bw的前景；
+
+%采用bw的距离变换得分水岭变换实现；
+
+%然后寻找结果的分水岭脊线DL==0
+
+%D=bwdist(BW)计算欧几里得距离公式
+
+%BW可以由任意维数，
+
+%D与BW有同样的大小
+
+D=bwdist(bw);
+
+DL=watershed(D);
+
+bgm = DL == 0;
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(2,2,1);imshow(Iobrcbr,[]);title('基于重建的开闭操作');
+
+subplot(2,2,2);imshow(bw,[]);title('阈值分割');
+
+subplot(2,2,3);imshow(label2rgb(DL),[]);title('分水岭变换示意图');
+
+subplot(2,2,4);imshow(bgm,[]);title('分水岭变换脊线图');
+
+
+
+
+%5.计算分水岭分割
+
+%imimposemin用来修改图像 使特定要求位置局部最小
+
+%imimposemin用来修改梯度幅值图像 在前景和背景标记像素局部极小
+
+gradmag2 = imimposemin(gradmag,bgm|fgm4);
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(2,2,1);imshow(bgm,[]);title('分水岭变换脊线图');
+
+subplot(2,2,2);imshow(fgm4,[]);title('前景标记');
+
+subplot(2,2,3);imshow(gradmag,[]);title('梯度幅值图像');
+
+subplot(2,2,4);imshow(gradmag2,[]);title('梯度幅值修改图像');
+
+
+
+%6.基于分水岭图像的分割计算
+
+%查看结果 叠加前景标记、背景标记 分割对象边界
+
+%采用膨胀实现某些要求 比如对象边界更加清晰可见
+
+%对象边界定位于L==0的位置；
+
+L=watershed(gradmag2);
+
+It1 = rgb(:,:,1);
+
+It2 = rgb(:,:,2);
+
+It3 = rgb(:,:,3);
+
+fgm5 = imdilate(L==0,ones(3,3)) | bgm | fgm4;
+
+It1(fgm5)=255;
+
+It2(fgm5)=0;   
+
+It3(fgm5)=0;   
+
+I4=cat(3,It1,It2,It3);
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(1,2,1);imshow(rgb,[]);title('原图像');
+
+subplot(1,2,2);imshow(I4,[]);title('标记和对象边缘叠加到原图像');
+
+ 
+
+%可视化说明了前景和后景标记如何影响结果
+
+%在几个位置 部分的较暗对象与它们邻近较亮对象相融合，
+
+%这是因为受遮挡的对象没有前景标记
+
+ 
+
+%另一可视化技术 将标记矩阵作为彩色图象显示
+
+%
+
+Lrgb = label2rgb(L,'jet','w','shuffle');
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(1,2,1);imshow(rgb,[]);title('原图像');
+
+subplot(1,2,2);imshow(Lrgb);title('彩色分水岭标记矩阵');
+
+ 
+
+%使用透明度来叠加这个伪彩色标记矩阵在原亮度图像上进行显示
+
+figure('units','normalized','position',[0 0 1 1]);
+
+subplot(1,2,1);imshow(rgb,[]);title('原图像');
+
+subplot(1,2,2);imshow(rgb,[]);hold on;
+
+himage = imshow(Lrgb);
+
+set(himage,'AlphaData',0.3);
+
+title('标记矩阵叠加到原图像');

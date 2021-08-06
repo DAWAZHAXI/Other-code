@@ -1,0 +1,12 @@
+oldpic=imread('ruili.png');
+if ~isempty(size(oldpic,3))
+    oldpic=rgb2gray(oldpic);
+end
+subplot(121);
+imshow(oldpic);
+title('原始图片灰度图像');
+oldpic=double(oldpic);
+newpic=log(1+oldpic);
+subplot(122);
+imshow(newpic,[]);
+title('对数变换后灰度图像');

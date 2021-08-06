@@ -1,0 +1,32 @@
+mydata = read.csv(file="A:/0010dawa.csv",header=TRUE,dec=".")
+##计算相关系数矩阵，保留2位
+res <-cor(mydata)
+round(res,2)   
+
+
+##库（Hmisc）＃加载包
+res2<-rcorr(as.matrix(mydata))
+res2
+#看R和P
+res2 $ r
+res2 $ P
+
+##可视化相关系数矩阵
+symnum(res,abbr.colnames = FALSE)
+
+#####加载corrplot包
+## corrplot（）函数绘制相关图
+corrplot(res,type="upper",order="hclust",tl.col = "black",tl.srt=45)
+
+## corrplot（）函数绘制相关图，结合显著性画图，不显著的为空白
+corrplot(res2$r,type="upper",order="hclust",tl.col = "black",p.mat=res2$P,sig.level = 0.05,insig = "blank")
+
+
+##库（PerformanceAnalytics）##加载包  ##绘制散点图
+chart.Correlation(mydata,histogram = TRUE,pch=19)
+
+
+
+##热力图制作
+col<-colorRampPalette(c("blue","white","red")) (20)
+heatmap(x=res,col=col,symm=TRUE)

@@ -1,0 +1,36 @@
+library(sp)
+library(raster)
+library(rgdal)
+library(trend)
+library(terra)
+#输入一个文件夹内的单波段TIFF数据，在这里是历年的NDVI年最大值
+flnames <- list.files(path = 'E:\\EVI\\', pattern = '.tif$')
+fl <- paste0("E:\\EVI\\", flnames)
+firs <- raster(fl[1])
+#时间跨度21年
+for (i in 1:21) {
+  r <- raster(fl[i])
+  firs <- stack(firs, r)
+}
+
+fun <- function(y){
+  if(length(na.omit(y)) <21) return(c(NA, NA, NA))   #删除数据不连续含有NA的像元
+  MK_estimate <- sens.slope(ts(na.omit(y), start = 2000, end = 2020, frequency = 1), conf.level = 0.95) #Sen斜率估计
+  slope <- MK_estimate$estimate
+  MK_test <- MK_estimate$p.value
+  Zs <- MK_estimate$statistic
+  return(c(Zs, slope, MK_test))
+}
+
+e <- calc(firs, fun)   #栅格计算
+e_Zs <- subset(e,1)  #提取Z统计量
+e_slope <- subset(e,2)   #提取sen斜率
+e_MKtest <- subset(e,3)   #提取p值
+
+plot(e_Zs)
+plot(e_slope)
+plot(e_MKtest)
+
+writeRaster(e_Zs, "E:\\LandsatEVI_Zs.tif", format="GTiff", overwrite=T)
+writeRaster(e_slope, "E:\\LandsatEVI_slope.tif", format="GTiff", overwrite=T)
+writeRaster(e_MKtest, "E:\\LandsatEVI_MKtest.tif", format="GTiff", overwrite=T)
